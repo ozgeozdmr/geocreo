@@ -1,0 +1,1791 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GEOCREO — Fikirlerin Coğrafyası</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root {
+      --paper: #f6f4ef;
+      --bone: #ede9e0;
+      --card: #fcfbf8;
+      --inset: #e4dfd4;
+      --ink: #171614;
+      --ink-2: #4e4a43;
+      --muted: #787268;
+      --border: rgba(23, 22, 20, 0.12);
+      --border-strong: rgba(23, 22, 20, 0.28);
+
+      --great-circle: #b65132;
+      --geodesic: #2a4d69;
+      --bezier: #3d6b59;
+      --organic: #9c742c;
+      --manual: #6d4c7d;
+
+      --font-serif: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    .app-shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--paper);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-title {
+      font-family: var(--font-serif);
+      font-size: 1.2rem;
+      letter-spacing: 0.1em;
+      margin: 0;
+      line-height: 1.1;
+    }
+
+    .brand-sub {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .nav-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--ink-2);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 6px 10px;
+      border-radius: 2px;
+      cursor: pointer;
+      transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+    }
+
+    .btn:hover:not(:disabled) {
+      border-color: var(--border-strong);
+      color: var(--ink);
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn.is-active,
+    .btn.is-primary {
+      background: var(--ink);
+      color: var(--paper);
+      border-color: var(--ink);
+    }
+
+    .btn.is-accent {
+      background: var(--great-circle);
+      color: var(--paper);
+      border-color: var(--great-circle);
+    }
+
+    .resources {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--ink-2);
+    }
+
+    .res-item strong {
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    /* Main Grid */
+    .workspace {
+      flex: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr);
+      gap: 18px;
+      padding: 18px 20px;
+      max-width: 1460px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 920px) {
+      .workspace {
+        grid-template-columns: 1fr;
+        padding: 14px;
+      }
+    }
+
+    .view-hidden {
+      display: none !important;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      padding: 16px;
+    }
+
+    .kicker {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin: 0 0 6px;
+    }
+
+    .serif-title {
+      font-family: var(--font-serif);
+      font-size: 1.35rem;
+      font-weight: 400;
+      line-height: 1.22;
+      margin: 0 0 8px;
+    }
+
+    /* Globe Panel */
+    .globe-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .toolbar-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .controls-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .mono-input, .mono-select {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      background: var(--paper);
+      color: var(--ink);
+      border-radius: 2px;
+    }
+
+    #globe-container {
+      width: 100%;
+      height: 460px;
+      border: 1px solid var(--border);
+      background: radial-gradient(circle at 50% 45%, #ede9e0 0%, #f6f4ef 72%);
+      position: relative;
+      overflow: hidden;
+      border-radius: 2px;
+      touch-action: none;
+    }
+
+    @media (max-width: 640px) {
+      #globe-container { height: 340px; }
+    }
+
+    .globe-overlay-hint {
+      position: absolute;
+      left: 12px;
+      bottom: 10px;
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      color: var(--ink-2);
+      background: rgba(246, 244, 239, 0.88);
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      pointer-events: none;
+    }
+
+    .connect-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 12px;
+      background: #f3e4dd;
+      border: 1px solid var(--great-circle);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--ink);
+    }
+
+    .legend-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    /* Side Rail */
+    .rail {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .discovery-art {
+      width: 100%;
+      height: 124px;
+      border: 1px solid var(--border);
+      margin-bottom: 10px;
+      background: var(--bone);
+      display: block;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 8px 0;
+    }
+
+    .tag {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border: 1px solid var(--border);
+      background: var(--paper);
+      color: var(--ink-2);
+    }
+
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    /* Requirements */
+    .req-list {
+      list-style: none;
+      margin: 10px 0 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .req-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: var(--ink-2);
+      padding: 5px 8px;
+      background: var(--paper);
+      border: 1px solid var(--border);
+    }
+
+    .req-item.is-done {
+      border-color: var(--bezier);
+      background: #e9f0ec;
+      color: var(--ink);
+    }
+
+    .req-badge {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      white-space: nowrap;
+    }
+
+    .mission-selector {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .mission-btn {
+      text-align: left;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      background: var(--paper);
+      cursor: pointer;
+      width: 100%;
+    }
+
+    .mission-btn.is-selected {
+      border-color: var(--ink);
+      background: var(--bone);
+    }
+
+    .mission-btn-title {
+      font-family: var(--font-serif);
+      font-size: 0.95rem;
+      color: var(--ink);
+    }
+
+    /* Archive / Collection Grid */
+    .archive-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .archive-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .route-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .route-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      background: var(--paper);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+    }
+
+    /* Generative Exhibition */
+    .exhibition-grid {
+      grid-template-columns: minmax(0, 1.45fr) minmax(290px, 1fr);
+    }
+
+    #art-canvas {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 4 / 3;
+      border: 1px solid var(--border-strong);
+      background: #f6f4ef;
+      display: block;
+    }
+
+    .slider-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 10px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--ink-2);
+    }
+
+    .score-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .score-box {
+      padding: 8px;
+      border: 1px solid var(--border);
+      background: var(--paper);
+    }
+
+    .score-val {
+      font-family: var(--font-serif);
+      font-size: 1.3rem;
+      color: var(--ink);
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      background: var(--ink);
+      color: var(--paper);
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      padding: 10px 14px;
+      border-radius: 2px;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 200ms ease, transform 200ms ease;
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    .toast.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .footer {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 20px;
+      border-top: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--muted);
+    }
+
+    /* Nasıl Oynanır Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(23, 22, 20, 0.52);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      z-index: 60;
+    }
+
+    .modal-card {
+      background: var(--card);
+      border: 1px solid var(--border-strong);
+      border-radius: 2px;
+      max-width: 680px;
+      width: 100%;
+      max-height: 88vh;
+      overflow-y: auto;
+      padding: 22px 24px;
+      box-shadow: 0 18px 40px rgba(23, 22, 20, 0.18);
+    }
+
+    .guide-steps {
+      list-style: none;
+      margin: 14px 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 10px;
+    }
+
+    .guide-step {
+      padding: 10px 12px;
+      background: var(--paper);
+      border: 1px solid var(--border);
+    }
+
+    .guide-step-title {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      color: var(--great-circle);
+      margin-bottom: 4px;
+    }
+
+    .guide-step p {
+      margin: 0;
+      font-size: 0.82rem;
+      color: var(--ink-2);
+    }
+
+    .guide-controls {
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: var(--bone);
+      border: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--ink-2);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <svg width="26" height="26" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+          <circle cx="32" cy="32" r="26" stroke="#171614" stroke-width="2"/>
+          <ellipse cx="32" cy="32" rx="12" ry="26" stroke="#171614" stroke-width="1.3"/>
+          <path d="M6 32h52M11 20h42M11 44h42" stroke="#171614" stroke-width="1"/>
+          <path d="M16 42 C24 22, 40 20, 48 26" stroke="#B65132" stroke-width="2.4" stroke-linecap="round"/>
+          <circle cx="16" cy="42" r="3" fill="#B65132"/>
+          <circle cx="48" cy="26" r="3" fill="#2A4D69"/>
+        </svg>
+        <div>
+          <h1 class="brand-title">GEOCREO</h1>
+          <div class="brand-sub">Fikirlerin Coğrafyası</div>
+        </div>
+      </div>
+
+      <nav class="nav-tabs" aria-label="Ana Görünümler">
+        <button type="button" class="btn is-active" data-tab="explore">1. Keşfet &amp; Ağ Kur</button>
+        <button type="button" class="btn" data-tab="archive">2. Arşiv (<span id="tab-archive-count">0</span>)</button>
+        <button type="button" class="btn" data-tab="exhibit">3. Üret &amp; Sergile</button>
+      </nav>
+
+      <div class="resources">
+        <span class="res-item">KEŞİF <strong id="res-discovery">12</strong></span>
+        <span class="res-item">BAĞLANTI <strong id="res-connection">10</strong></span>
+        <span class="res-item">ARŞİV <strong id="res-archive">0/8</strong></span>
+        <button type="button" class="btn is-accent" id="btn-how-to-play">Nasıl Oynanır?</button>
+        <button type="button" class="btn" id="btn-sound" title="Sesi aç veya kapat">Ses: Açık</button>
+      </div>
+    </header>
+
+    <!-- VIEW 1: EXPLORE & NETWORK -->
+    <main id="view-explore" class="workspace">
+      <section class="card globe-panel">
+        <div class="toolbar-row">
+          <div class="controls-group">
+            <select id="select-mode" class="mono-select" aria-label="World Distribution Mode">
+              <option value="CONTINENTAL_CLUSTERS">Mod: Kıtasal Kümeler</option>
+              <option value="GLOBAL_SCATTER">Mod: Küresel Dağılım</option>
+              <option value="ORBITAL_PATTERNS">Mod: Yörünge Desenleri</option>
+              <option value="GEOGRAPHIC_DENSITY">Mod: Coğrafi Yoğunluk</option>
+              <option value="CHAOTIC_NETWORK">Mod: Kaotik Ağ</option>
+            </select>
+            <input id="input-seed" class="mono-input" type="text" value="geocreo-mediterranean" aria-label="World Seed" style="width: 145px;" />
+            <button type="button" class="btn" id="btn-regen">Yeniden Üret</button>
+          </div>
+          <div class="controls-group">
+            <select id="select-route-type" class="mono-select" aria-label="Route Function">
+              <option value="GREAT_CIRCLE">Rota: Büyük Daire (Great Circle)</option>
+              <option value="SHORTEST_GEODESIC">Rota: Jeodezik Yol</option>
+              <option value="BEZIER_CURVE">Rota: Bézier Eğrisi</option>
+              <option value="ORGANIC_PROCEDURAL">Rota: Organik Eğri</option>
+              <option value="MANUAL">Rota: Manuel Bağlantı</option>
+            </select>
+            <button type="button" class="btn is-active" id="btn-rotate">Dönüş: Açık</button>
+          </div>
+        </div>
+
+        <div id="connect-banner" class="connect-banner view-hidden">
+          <span id="connect-banner-text">Bağlamak için küre üzerinde ikinci bir noktaya tıkla.</span>
+          <button type="button" class="btn" id="btn-cancel-connect">İptal</button>
+        </div>
+
+        <div id="globe-container">
+          <div class="globe-overlay-hint">Sürükle: Döndür · Tekerlek: Yakınlaştır · Noktaya Tıkla: Keşfet &amp; Bağla</div>
+        </div>
+
+        <div class="legend-bar">
+          <span>
+            <span class="dot" style="background:#171614;"></span>Keşfedilmemiş
+            &nbsp;&nbsp;<span class="dot" style="background:#2a4d69;"></span>Keşfedildi
+            &nbsp;&nbsp;<span class="dot" style="background:#3d6b59;"></span>Arşivlendi
+            &nbsp;&nbsp;<span class="dot" style="background:#b65132;"></span>Seçili
+          </span>
+          <span id="stats-summary">0 keşif · 0 rota</span>
+        </div>
+      </section>
+
+      <aside class="rail">
+        <section class="card" id="discovery-panel">
+          <p class="kicker">Görsel Keşif Paneli</p>
+          <div id="discovery-content">
+            <h2 class="serif-title">Keşfe Başla</h2>
+            <p style="color: var(--ink-2); margin: 0;">
+              3B Dünya üzerindeki herhangi bir noktaya tıklayarak kültürel parçayı keşfet, kişisel arşivine ekle ve küresel rotalarla coğrafi ağını ör.
+            </p>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="toolbar-row">
+            <p class="kicker" style="margin:0;">Küratöryel Görev</p>
+            <span class="req-badge" id="mission-progress-label">0/4</span>
+          </div>
+          <h2 class="serif-title" id="mission-title">Yalnızlığın Mimarisi</h2>
+          <p id="mission-prompt" style="margin: 0; color: var(--ink-2); font-size: 0.85rem;"></p>
+          <ul class="req-list" id="mission-reqs"></ul>
+
+          <div class="mission-selector" id="mission-selector"></div>
+        </section>
+      </aside>
+    </main>
+
+    <!-- VIEW 2: ARCHIVE & ROUTES -->
+    <main id="view-archive" class="workspace view-hidden">
+      <section class="card">
+        <div class="toolbar-row">
+          <div>
+            <p class="kicker">Kişisel Arşiv · Kürasyon Panosu</p>
+            <h2 class="serif-title" style="margin-bottom:0;">Toplanan Kültürel Parçalar</h2>
+          </div>
+          <span class="req-badge" id="archive-capacity-label">0 / 8 kapasite</span>
+        </div>
+        <div id="archive-grid" class="archive-grid"></div>
+      </section>
+
+      <aside class="rail">
+        <section class="card">
+          <p class="kicker">Coğrafi Ağ Topolojisi</p>
+          <h2 class="serif-title">Aktif Küresel Rotalar</h2>
+          <p style="margin: 0; color: var(--ink-2); font-size: 0.84rem;">
+            Kurduğun her bağlantı, nihai generatif sanat eserinin geometrisini, kesişimlerini ve renk kümelerini belirler.
+          </p>
+          <div id="route-list" class="route-list"></div>
+        </section>
+      </aside>
+    </main>
+
+    <!-- VIEW 3: GENERATE & EXHIBIT -->
+    <main id="view-exhibit" class="workspace exhibition-grid view-hidden">
+      <section class="card">
+        <div class="toolbar-row" style="margin-bottom: 10px;">
+          <div>
+            <p class="kicker">Hibrit Generatif Motor · Ağ Sanatı + Materyal Kolajı</p>
+            <h2 class="serif-title" style="margin-bottom:0;" id="exhibit-heading">Küratöryel Dijital Sergi</h2>
+          </div>
+          <div class="controls-group">
+            <button type="button" class="btn is-accent" id="btn-export-png">PNG İndir</button>
+          </div>
+        </div>
+        <canvas id="art-canvas" width="960" height="720"></canvas>
+        <p id="exhibit-narrative" style="margin: 12px 0 0; font-family: var(--font-serif); font-style: italic; color: var(--ink-2);"></p>
+      </section>
+
+      <aside class="rail">
+        <section class="card">
+          <p class="kicker">Kompozisyon Kontrolleri</p>
+          <div class="slider-row">
+            <label for="select-art-style">Görsel Stil</label>
+            <select id="select-art-style" class="mono-select">
+              <option value="editorial">Deneysel Kartografya</option>
+              <option value="minimal">Minimalist Çizgi Sanatı</option>
+              <option value="nocturne">Gece Veri Sanatı</option>
+            </select>
+          </div>
+          <div class="slider-row">
+            <label for="range-thickness">Rota Çizgi Kalınlığı: <span id="val-thickness">2.4</span>px</label>
+            <input id="range-thickness" type="range" min="1" max="5" step="0.2" value="2.4" />
+          </div>
+          <div class="slider-row">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+              <input id="chk-collage" type="checkbox" checked />
+              Materyal Kolajı Parçalarını Katmanla (Motor B)
+            </label>
+          </div>
+        </section>
+
+        <section class="card">
+          <p class="kicker">Şeffaf Küratöryel Değerlendirme</p>
+          <div class="score-grid" id="score-grid"></div>
+        </section>
+      </aside>
+    </main>
+
+    <footer class="footer">
+      <span>Yerleri keşfet. Parçaları topla. Fikirleri bağla. Anlam üret.</span>
+      <span>Coğrafya tuvaldir · Ağ kompozisyondur · Materyaller malzemedir</span>
+    </footer>
+  </div>
+
+  <div id="guide-modal" class="modal-backdrop view-hidden" role="dialog" aria-modal="true" aria-labelledby="guide-title">
+    <div class="modal-card">
+      <div class="toolbar-row" style="margin-bottom: 8px;">
+        <div>
+          <p class="kicker" style="margin:0;">GEOCREO Oyun Rehberi</p>
+          <h2 class="serif-title" id="guide-title" style="margin:0;">Nasıl Oynanır?</h2>
+        </div>
+        <button type="button" class="btn is-primary" id="btn-close-guide">Kapat (Esc)</button>
+      </div>
+      <p style="margin: 0; color: var(--ink-2); font-size: 0.86rem;">
+        GEOCREO'da amaç dünyadaki tüm noktaları toplamak değil; seçtiğin küratöryel göreve (curatorial mission) uygun parçaları sınırlı kaynaklarla bir araya getirip kendi coğrafi ağından özgün bir sanat eseri üretmektir.
+      </p>
+      <ol class="guide-steps">
+        <li class="guide-step">
+          <div class="guide-step-title">1. Görev &amp; Mod Seç</div>
+          <p>Sağ alttan bir küratöryel görev, üst çubuktan ise 5 dağılım modundan (distribution mode) birini seç.</p>
+        </li>
+        <li class="guide-step">
+          <div class="guide-step-title">2. 3B Dünya'yı Keşfet</div>
+          <p>Küreyi sürükleyerek döndür ve siyah noktalara tıkla. Her yeni keşif 1 <strong>Keşif Puanı</strong> harcar ve maviye döner.</p>
+        </li>
+        <li class="guide-step">
+          <div class="guide-step-title">3. Arşivine Topla</div>
+          <p>Sağdaki keşif panelinden göreve uygun parçaları <strong>Arşive Ekle</strong>. Yeşil noktalar arşivindeki parçaları gösterir (maks. 8).</p>
+        </li>
+        <li class="guide-step">
+          <div class="guide-step-title">4. Coğrafi Ağ Kur</div>
+          <p>Üstten rota türünü seç (Büyük Daire, Bézier vb.), <strong>Buradan Rota Bağla</strong>'ya bas ve kürede ikinci bir noktaya tıkla (1 <strong>Bağlantı Enerjisi</strong>).</p>
+        </li>
+        <li class="guide-step">
+          <div class="guide-step-title">5. Strateji &amp; Arşiv Yönet</div>
+          <p><strong>2. Arşiv</strong> sekmesinden topladığın parçaları ve aktif rotaları inceleyip gerektiğinde kaldırarak kaynak açabilirsin.</p>
+        </li>
+        <li class="guide-step">
+          <div class="guide-step-title">6. Üret &amp; Sergile</div>
+          <p><strong>3. Üret &amp; Sergile</strong> sekmesinde kurduğun ağ ve arşivinden doğan hibrit sanat eserini özelleştirip <strong>PNG İndir</strong> ile kaydet.</p>
+        </li>
+      </ol>
+      <div class="guide-controls">
+        <strong>Kontroller:</strong> Sol tık + Sürükle = Küreyi döndür · Fare tekerleği = Yakınlaştır/Uzaklaştır · Noktaya tıkla = Keşfet veya rota bağla
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      // ---------- 1. DATA & MISSIONS ----------
+      const ROUTE_COLORS = {
+        GREAT_CIRCLE: '#b65132',
+        SHORTEST_GEODESIC: '#2a4d69',
+        BEZIER_CURVE: '#3d6b59',
+        ORGANIC_PROCEDURAL: '#9c742c',
+        MANUAL: '#6d4c7d',
+      };
+
+      const ROUTE_LABELS = {
+        GREAT_CIRCLE: 'Büyük Daire',
+        SHORTEST_GEODESIC: 'Jeodezik Yol',
+        BEZIER_CURVE: 'Bézier Eğrisi',
+        ORGANIC_PROCEDURAL: 'Organik Eğri',
+        MANUAL: 'Manuel Bağlantı',
+      };
+
+      const REGIONAL_ANCHORS = [
+        { settlement: 'İstanbul', country: 'Türkiye', lat: 41.01, lon: 28.97 },
+        { settlement: 'Atina', country: 'Yunanistan', lat: 37.98, lon: 23.73 },
+        { settlement: 'Lizbon', country: 'Portekiz', lat: 38.72, lon: -9.14 },
+        { settlement: 'Kyoto', country: 'Japonya', lat: 35.01, lon: 135.77 },
+        { settlement: 'Tokyo', country: 'Japonya', lat: 35.68, lon: 139.65 },
+        { settlement: 'Kahire', country: 'Mısır', lat: 30.04, lon: 31.24 },
+        { settlement: 'Reykjavik', country: 'İzlanda', lat: 64.15, lon: -21.94 },
+        { settlement: 'Buenos Aires', country: 'Arjantin', lat: -34.60, lon: -58.38 },
+        { settlement: 'New York', country: 'ABD', lat: 40.71, lon: -74.01 },
+        { settlement: 'Nairobi', country: 'Kenya', lat: -1.29, lon: 36.82 },
+        { settlement: 'Venedik', country: 'İtalya', lat: 45.44, lon: 12.32 },
+        { settlement: 'Marakeş', country: 'Fas', lat: 31.63, lon: -7.98 },
+        { settlement: 'Seul', country: 'Güney Kore', lat: 37.57, lon: 126.98 },
+        { settlement: 'Wellington', country: 'Yeni Zelanda', lat: -41.29, lon: 174.78 },
+      ];
+
+      const CULTURAL_POOL = [
+        { title: 'Alacakaranlıkta Beton Avlu', category: 'architecture', quote: 'Sessiz bir sahil yürüyüşünde akşam gölgelerini yakalayan brütalist merdiven geometrisi.', pigment: '#b65132' },
+        { title: 'Liman Sisi ve Uzak Vapur Düdüğü', category: 'music', quote: 'Gün doğumundan önce liman suyu ve düşük frekanslı deniz rezonansı alan kaydı.', pigment: '#2a4d69' },
+        { title: 'Boş Bir İstasyon Üzerine Notlar', category: 'literature', quote: '“Her harita, yalnızca bir kez geçip giden insanların ayak izlerini hatırlar.”', pigment: '#3d6b59' },
+        { title: 'Kireçtaşı Kemer Etüdü IV', category: 'architecture', quote: 'Tenha bir öğle meydanını çerçeveleyen aşınmış taş kemerlerin ritmik tekrarı.', pigment: '#9c742c' },
+        { title: 'Portolan Kıyı Haritası Folyosu', category: 'historical', quote: 'Tarihi deniz ticaret koridorlarına yayılan dijitalleştirilmiş pusula gülü kerte çizgileri.', pigment: '#6d4c7d' },
+        { title: 'Kayrak Çatılarda Yağmur', category: 'photograph', quote: 'Kıyı sisinde eriyen kent çatılarının monokrom uzun pozlama fotoğraf çalışması.', pigment: '#2a4d69' },
+        { title: 'Yaylılar ve Rüzgâr İçin Noktürn', category: 'music', quote: 'Gece yarısı açık bir taş amfitiyatroda kaydedilmiş minimalist oda müziği motifi.', pigment: '#b65132' },
+        { title: 'Jeodezik Kâğıt Rölyef', category: 'artwork', quote: 'Yükselti eğrilerini ve gölge yoğunluğunu inceleyen katlanmış arşiv kâğıdı topoğrafyası.', pigment: '#3d6b59' },
+      ];
+
+      const MISSIONS = [
+        {
+          id: 'solitude',
+          title: 'Yalnızlığın Mimarisi',
+          prompt: 'Şehirler ile yalnızlık arasındaki ilişki üzerine görsel ve işitsel bir anlatı kur.',
+          reqs: [
+            { id: 'r1', label: 'En az 4 coğrafi nokta keşfet', check: (s) => s.points.filter(p => p.discovered).length >= 4 },
+            { id: 'r2', label: 'En az 2 mimari parça topla', check: (s) => s.collection.filter(id => getPoint(id)?.category === 'architecture').length >= 2 },
+            { id: 'r3', label: 'En az 1 müzik veya edebiyat parçası topla', check: (s) => s.collection.some(id => ['music', 'literature'].includes(getPoint(id)?.category)) },
+            { id: 'r4', label: 'En az 3 coğrafi rota kur', check: (s) => s.routes.length >= 3 },
+          ],
+        },
+        {
+          id: 'mediterranean',
+          title: 'Akdeniz’in Hafızası',
+          prompt: 'Kıyı etkileşimlerini, deniz rotalarını ve uzak sular boyunca paylaşılan kültürel izleri takip et.',
+          reqs: [
+            { id: 'r1', label: 'En az 5 konum keşfet', check: (s) => s.points.filter(p => p.discovered).length >= 5 },
+            { id: 'r2', label: 'En az 3 kültürel parça topla', check: (s) => s.collection.length >= 3 },
+            { id: 'r3', label: 'En az 2 farklı rota türü kullan', check: (s) => new Set(s.routes.map(r => r.routeType)).size >= 2 },
+            { id: 'r4', label: 'En az 4 coğrafi rota kur', check: (s) => s.routes.length >= 4 },
+          ],
+        },
+        {
+          id: 'remote-sound',
+          title: 'Uzak Yerlerin Sesi',
+          prompt: 'Akustik manzaraları ve mimari dinginliği özgün bir kartografik kompozisyona dönüştür.',
+          reqs: [
+            { id: 'r1', label: 'En az 4 konum keşfet', check: (s) => s.points.filter(p => p.discovered).length >= 4 },
+            { id: 'r2', label: 'En az 1 ses/müzik kaydı topla', check: (s) => s.collection.some(id => getPoint(id)?.category === 'music') },
+            { id: 'r3', label: 'En az 2 farklı ülkeyi birbirine bağla', check: (s) => getConnectedCountries(s).size >= 2 },
+            { id: 'r4', label: 'Build 3+ geographical routes', check: (s) => s.routes.length >= 3 },
+          ],
+        },
+      ];
+
+      // ---------- 2. GEOSPATIAL MATH & SEEDED RNG ----------
+      const GLOBE_R = 1;
+      const EARTH_KM = 6371;
+
+      function hashSeed(str) {
+        let h = 2166136261 >>> 0;
+        for (let i = 0; i < str.length; i++) {
+          h ^= str.charCodeAt(i);
+          h = Math.imul(h, 16777619);
+        }
+        return h >>> 0;
+      }
+
+      function createRng(seed) {
+        let st = hashSeed(seed) || 1;
+        return () => {
+          st = (st + 0x6d2b79f5) | 0;
+          let t = Math.imul(st ^ (st >>> 15), 1 | st);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function gauss(rng) {
+        return Math.sqrt(-2 * Math.log(Math.max(1e-7, rng()))) * Math.cos(2 * Math.PI * rng());
+      }
+
+      function clampLat(lat) { return Math.max(-78, Math.min(78, lat)); }
+      function wrapLon(lon) {
+        let w = ((lon + 180) % 360 + 360) % 360 - 180;
+        return w === -180 ? 180 : w;
+      }
+
+      function latLonToVec3(lat, lon, r = GLOBE_R) {
+        const phi = (90 - lat) * (Math.PI / 180);
+        const theta = (lon + 180) * (Math.PI / 180);
+        return new THREE.Vector3(
+          -r * Math.sin(phi) * Math.cos(theta),
+          r * Math.cos(phi),
+          r * Math.sin(phi) * Math.sin(theta)
+        );
+      }
+
+      function haversineKm(a, b) {
+        const dLat = (b.lat - a.lat) * Math.PI / 180;
+        const dLon = (b.lon - a.lon) * Math.PI / 180;
+        const l1 = a.lat * Math.PI / 180;
+        const l2 = b.lat * Math.PI / 180;
+        const h = Math.sin(dLat / 2) ** 2 + Math.cos(l1) * Math.cos(l2) * Math.sin(dLon / 2) ** 2;
+        return 2 * EARTH_KM * Math.asin(Math.min(1, Math.sqrt(h)));
+      }
+
+      function nearestAnchor(lat, lon) {
+        let best = REGIONAL_ANCHORS[0];
+        let minD = Infinity;
+        for (const a of REGIONAL_ANCHORS) {
+          const d = haversineKm({ lat, lon }, a);
+          if (d < minD) { minD = d; best = a; }
+        }
+        return best;
+      }
+
+      function generatePoints(mode, seed, count = 28) {
+        const rng = createRng(`${mode}:${seed}`);
+        const coords = [];
+
+        if (mode === 'GLOBAL_SCATTER') {
+          for (let i = 0; i < count; i++) {
+            const u = rng() * 2 - 1;
+            coords.push({ lat: clampLat(Math.asin(u) * 180 / Math.PI), lon: wrapLon(rng() * 360 - 180) });
+          }
+        } else if (mode === 'CONTINENTAL_CLUSTERS') {
+          const centers = [
+            { lat: 41, lon: 18 }, { lat: 36, lon: 132 }, { lat: 39, lon: -95 },
+            { lat: -22, lon: -58 }, { lat: 4, lon: 22 }, { lat: -30, lon: 145 },
+          ];
+          for (let i = 0; i < count; i++) {
+            const c = centers[i % centers.length];
+            coords.push({ lat: clampLat(c.lat + gauss(rng) * 9), lon: wrapLon(c.lon + gauss(rng) * 13) });
+          }
+        } else if (mode === 'ORBITAL_PATTERNS') {
+          const incl = [34, 54, -42];
+          const off = [0, 120, 240];
+          for (let i = 0; i < count; i++) {
+            const k = i % 3;
+            const t = (i / count) * Math.PI * 2;
+            coords.push({
+              lat: clampLat(Math.sin(t * 1.5 + k) * incl[k] + (rng() - 0.5) * 3.5),
+              lon: wrapLon(t * 180 / Math.PI - 180 + off[k]),
+            });
+          }
+        } else if (mode === 'GEOGRAPHIC_DENSITY') {
+          for (let i = 0; i < count; i++) {
+            const a = REGIONAL_ANCHORS[Math.floor(rng() * REGIONAL_ANCHORS.length)];
+            coords.push({ lat: clampLat(a.lat + gauss(rng) * 4.2), lon: wrapLon(a.lon + gauss(rng) * 6) });
+          }
+        } else {
+          let curLat = (rng() - 0.5) * 90;
+          let curLon = rng() * 360 - 180;
+          for (let i = 0; i < count; i++) {
+            if (i > 0 && i % 6 === 0) {
+              curLat = (rng() - 0.5) * 100;
+              curLon = rng() * 360 - 180;
+            } else {
+              curLat = clampLat(curLat + (rng() - 0.5) * 24);
+              curLon = wrapLon(curLon + (rng() - 0.5) * 34);
+            }
+            coords.push({ lat: curLat, lon: curLon });
+          }
+        }
+
+        return coords.map((c, idx) => {
+          const anchor = nearestAnchor(c.lat, c.lon);
+          const tpl = CULTURAL_POOL[idx % CULTURAL_POOL.length];
+          return {
+            id: `p-${idx + 1}`,
+            lat: Number(c.lat.toFixed(2)),
+            lon: Number(c.lon.toFixed(2)),
+            settlement: `${anchor.settlement} Yakını`,
+            country: anchor.country,
+            title: tpl.title,
+            category: tpl.category,
+            quote: tpl.quote,
+            pigment: tpl.pigment,
+            discovered: idx < 2, // Start with 2 discovered points so player can immediately test routes
+          };
+        });
+      }
+
+      // ---------- 3. SYNTHESIZED AUDIO (Web Audio API) ----------
+      let audioCtx = null;
+      function playTone(freq, duration = 0.14, type = 'sine') {
+        if (!state.soundOn) return;
+        try {
+          if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          if (audioCtx.state === 'suspended') audioCtx.resume();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + duration);
+        } catch (_) {}
+      }
+
+      // ---------- 4. STATE ----------
+      const state = {
+        tab: 'explore',
+        mode: 'CONTINENTAL_CLUSTERS',
+        seed: 'geocreo-mediterranean',
+        routeType: 'GREAT_CIRCLE',
+        autoRotate: true,
+        soundOn: true,
+        missionId: MISSIONS[0].id,
+        points: [],
+        selectedPointId: null,
+        connectSourceId: null,
+        collection: [],
+        routes: [],
+        resources: { discovery: 12, connection: 10, capacity: 8 },
+        artStyle: 'editorial',
+        strokeWeight: 2.4,
+        includeCollage: true,
+      };
+
+      function getPoint(id) {
+        return state.points.find(p => p.id === id) || null;
+      }
+
+      function getConnectedCountries(s) {
+        const set = new Set();
+        for (const r of s.routes) {
+          const a = getPoint(r.fromId);
+          const b = getPoint(r.toId);
+          if (a) set.add(a.country);
+          if (b) set.add(b.country);
+        }
+        return set;
+      }
+
+      function showToast(msg) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.classList.add('is-visible');
+        clearTimeout(showToast._t);
+        showToast._t = setTimeout(() => el.classList.remove('is-visible'), 2300);
+      }
+
+      // ---------- 5. THREE.JS 3D GLOBE ----------
+      let scene, camera, renderer, globeMesh, pointsGroup, routesGroup;
+      let camTheta = 0.4, camPhi = 1.25, camDist = 3.15;
+      let isPointerDown = false, pointerMoved = 0, lastX = 0, lastY = 0;
+
+      function createCartographicTexture() {
+        const w = 2048, h = 1024;
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#DCD4C3';
+        ctx.fillRect(0, 0, w, h);
+
+        // Stylized archival continents
+        ctx.fillStyle = '#BEB198';
+        const blobs = [
+          [440, 310, 210, 125], [620, 645, 95, 165],
+          [1080, 275, 130, 82], [1110, 520, 150, 175],
+          [1440, 320, 290, 145], [1680, 690, 115, 78],
+        ];
+        for (const [cx, cy, rx, ry] of blobs) {
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Graticule lines every 15 deg
+        ctx.strokeStyle = 'rgba(23, 22, 20, 0.24)';
+        ctx.lineWidth = 1;
+        for (let lon = -180; lon <= 180; lon += 15) {
+          const x = ((lon + 180) / 360) * w;
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+        }
+        for (let lat = -75; lat <= 75; lat += 15) {
+          const y = ((90 - lat) / 180) * h;
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+        }
+        ctx.strokeStyle = 'rgba(182, 81, 50, 0.38)';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
+
+        const tex = new THREE.CanvasTexture(c);
+        return tex;
+      }
+
+      function updateCamera() {
+        camera.position.set(
+          camDist * Math.sin(camPhi) * Math.cos(camTheta),
+          camDist * Math.cos(camPhi),
+          camDist * Math.sin(camPhi) * Math.sin(camTheta)
+        );
+        camera.lookAt(0, 0, 0);
+      }
+
+      function initGlobe() {
+        const container = document.getElementById('globe-container');
+        scene = new THREE.Scene();
+
+        camera = new THREE.PerspectiveCamera(42, container.clientWidth / Math.max(1, container.clientHeight), 0.1, 100);
+        updateCamera();
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        container.appendChild(renderer.domElement);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.58));
+        const dirLight = new THREE.DirectionalLight(0xfff6e8, 0.36);
+        dirLight.position.set(4, 3, 4);
+        scene.add(dirLight);
+
+        const globeGeo = new THREE.SphereGeometry(GLOBE_R, 64, 64);
+        const globeMat = new THREE.MeshStandardMaterial({
+          map: createCartographicTexture(),
+          roughness: 0.92,
+          metalness: 0.02,
+        });
+        globeMesh = new THREE.Mesh(globeGeo, globeMat);
+        scene.add(globeMesh);
+
+        pointsGroup = new THREE.Group();
+        routesGroup = new THREE.Group();
+        globeMesh.add(pointsGroup);
+        globeMesh.add(routesGroup);
+
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+
+        const getHitPointId = (clientX, clientY) => {
+          const rect = renderer.domElement.getBoundingClientRect();
+          pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+          pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+          raycaster.setFromCamera(pointer, camera);
+          const hits = raycaster.intersectObjects(pointsGroup.children, false);
+          return hits.length > 0 ? hits[0].object.userData.pointId : null;
+        };
+
+        renderer.domElement.addEventListener('pointerdown', (e) => {
+          isPointerDown = true;
+          pointerMoved = 0;
+          lastX = e.clientX;
+          lastY = e.clientY;
+        });
+
+        window.addEventListener('pointermove', (e) => {
+          if (isPointerDown) {
+            const dx = e.clientX - lastX;
+            const dy = e.clientY - lastY;
+            pointerMoved += Math.hypot(dx, dy);
+            camTheta -= dx * 0.006;
+            camPhi = Math.max(0.25, Math.min(Math.PI - 0.25, camPhi - dy * 0.006));
+            lastX = e.clientX;
+            lastY = e.clientY;
+            updateCamera();
+          } else if (e.target === renderer.domElement) {
+            const hit = getHitPointId(e.clientX, e.clientY);
+            renderer.domElement.style.cursor = hit ? 'pointer' : 'grab';
+          }
+        });
+
+        window.addEventListener('pointerup', (e) => {
+          if (!isPointerDown) return;
+          isPointerDown = false;
+          if (pointerMoved < 6 && e.target === renderer.domElement) {
+            const hitId = getHitPointId(e.clientX, e.clientY);
+            if (hitId) handlePointClick(hitId);
+          }
+        });
+
+        renderer.domElement.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          camDist = Math.max(1.55, Math.min(4.4, camDist + e.deltaY * 0.0014));
+          updateCamera();
+        }, { passive: false });
+
+        window.addEventListener('resize', () => {
+          const w = container.clientWidth;
+          const h = Math.max(1, container.clientHeight);
+          if (w > 0 && h > 0) {
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+          }
+        });
+
+        const animate = () => {
+          requestAnimationFrame(animate);
+          if (state.autoRotate && !isPointerDown && state.tab === 'explore') {
+            globeMesh.rotation.y += 0.0018;
+          }
+          renderer.render(scene, camera);
+        };
+        animate();
+      }
+
+      function syncGlobeMarkers() {
+        while (pointsGroup.children.length > 0) {
+          const m = pointsGroup.children.pop();
+          m.geometry.dispose();
+          m.material.dispose();
+        }
+        for (const p of state.points) {
+          const isSel = p.id === state.selectedPointId || p.id === state.connectSourceId;
+          const isCol = state.collection.includes(p.id);
+          const color = isSel ? 0xb65132 : isCol ? 0x3d6b59 : p.discovered ? 0x2a4d69 : 0x171614;
+          const r = isSel ? 0.028 : p.discovered ? 0.022 : 0.017;
+          const mesh = new THREE.Mesh(
+            new THREE.SphereGeometry(r, 16, 16),
+            new THREE.MeshBasicMaterial({ color })
+          );
+          mesh.position.copy(latLonToVec3(p.lat, p.lon, GLOBE_R + 0.015));
+          mesh.userData.pointId = p.id;
+          pointsGroup.add(mesh);
+        }
+      }
+
+      function buildSphericalCurvePoints(a, b, routeType) {
+        const v1 = latLonToVec3(a.lat, a.lon, GLOBE_R + 0.015);
+        const v2 = latLonToVec3(b.lat, b.lon, GLOBE_R + 0.015);
+        const distAngle = v1.angleTo(v2);
+        const steps = 40;
+        const pts = [];
+
+        const axis = new THREE.Vector3().crossVectors(v1, v2).normalize();
+        const mid = v1.clone().add(v2).normalize();
+
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const interp = new THREE.Vector3().lerpVectors(v1, v2, t).normalize();
+          let lift = Math.sin(Math.PI * t) * Math.min(0.28, 0.06 + distAngle * 0.14);
+
+          if (routeType === 'SHORTEST_GEODESIC') {
+            lift *= 0.25;
+          } else if (routeType === 'BEZIER_CURVE') {
+            lift *= 1.45;
+            interp.addScaledVector(axis, Math.sin(Math.PI * t) * 0.16).normalize();
+          } else if (routeType === 'ORGANIC_PROCEDURAL') {
+            lift *= 0.9;
+            interp.addScaledVector(axis, Math.sin(Math.PI * 2 * t) * 0.12).normalize();
+          } else if (routeType === 'MANUAL') {
+            lift = Math.sin(Math.PI * t) * 0.04;
+          }
+
+          pts.push(interp.multiplyScalar(GLOBE_R + 0.015 + lift));
+        }
+        return pts;
+      }
+
+      function syncGlobeRoutes() {
+        while (routesGroup.children.length > 0) {
+          const line = routesGroup.children.pop();
+          line.geometry.dispose();
+          line.material.dispose();
+        }
+        for (const r of state.routes) {
+          const a = getPoint(r.fromId);
+          const b = getPoint(r.toId);
+          if (!a || !b) continue;
+          const pts = buildSphericalCurvePoints(a, b, r.routeType);
+          const geo = new THREE.BufferGeometry().setFromPoints(pts);
+          const mat = new THREE.LineBasicMaterial({
+            color: ROUTE_COLORS[r.routeType] || '#b65132',
+            transparent: true,
+            opacity: 0.88,
+          });
+          routesGroup.add(new THREE.Line(geo, mat));
+        }
+      }
+
+      // ---------- 6. GAMEPLAY ACTIONS ----------
+      function handlePointClick(pointId) {
+        const pt = getPoint(pointId);
+        if (!pt) return;
+
+        // If in connect mode, attempt to form a route
+        if (state.connectSourceId) {
+          if (state.connectSourceId === pointId) {
+            state.connectSourceId = null;
+            renderAll();
+            return;
+          }
+          if (!pt.discovered) {
+            if (state.resources.discovery <= 0) {
+              showToast('Bu hedefi açmak için Keşif Puanın kalmadı.');
+              return;
+            }
+            pt.discovered = true;
+            state.resources.discovery -= 1;
+          }
+          createRoute(state.connectSourceId, pointId);
+          state.connectSourceId = null;
+          state.selectedPointId = pointId;
+          renderAll();
+          return;
+        }
+
+        if (!pt.discovered) {
+          if (state.resources.discovery <= 0) {
+            showToast('Keşif Puanın tükendi — keşfettiğin noktaları inceleyebilirsin.');
+            return;
+          }
+          pt.discovered = true;
+          state.resources.discovery -= 1;
+          playTone(520, 0.14, 'triangle');
+          showToast(`Keşfedildi: ${pt.title} (${pt.settlement})`);
+        } else {
+          playTone(420, 0.09, 'sine');
+        }
+        state.selectedPointId = pointId;
+        renderAll();
+      }
+
+      function toggleCollect(pointId) {
+        const idx = state.collection.indexOf(pointId);
+        if (idx >= 0) {
+          state.collection.splice(idx, 1);
+          playTone(300, 0.1, 'sine');
+          showToast('Parça Kişisel Arşivden çıkarıldı.');
+        } else {
+          if (state.collection.length >= state.resources.capacity) {
+            showToast('Arşiv kapasitesi doldu (8/8). Önce bir parça çıkar.');
+            return;
+          }
+          state.collection.push(pointId);
+          playTone(660, 0.16, 'triangle');
+          showToast('Parça Kişisel Arşive eklendi.');
+        }
+        renderAll();
+      }
+
+      function createRoute(fromId, toId) {
+        const exists = state.routes.some(
+          r => (r.fromId === fromId && r.toId === toId) || (r.fromId === toId && r.toId === fromId)
+        );
+        if (exists) {
+          showToast('Bu iki konum arasında zaten bir rota var.');
+          return;
+        }
+        if (state.resources.connection <= 0) {
+          showToast('Bağlantı Enerjin kalmadı.');
+          return;
+        }
+        const a = getPoint(fromId);
+        const b = getPoint(toId);
+        const dist = Math.round(haversineKm(a, b));
+        state.routes.push({
+          id: `r-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          fromId,
+          toId,
+          routeType: state.routeType,
+          distanceKm: dist,
+        });
+        state.resources.connection -= 1;
+        playTone(440, 0.12, 'sine');
+        setTimeout(() => playTone(660, 0.16, 'triangle'), 70);
+        showToast(`${ROUTE_LABELS[state.routeType]} oluşturuldu (${dist.toLocaleString('tr-TR')} km)`);
+      }
+
+      function removeRoute(routeId) {
+        state.routes = state.routes.filter(r => r.id !== routeId);
+        state.resources.connection = Math.min(10, state.resources.connection + 1);
+        renderAll();
+      }
+
+      function resetWorld(mode, seed) {
+        state.mode = mode;
+        state.seed = seed || 'geocreo';
+        state.points = generatePoints(state.mode, state.seed, 28);
+        state.selectedPointId = state.points[0].id;
+        state.connectSourceId = null;
+        state.collection = [];
+        state.routes = [];
+        state.resources = { discovery: 12, connection: 10, capacity: 8 };
+        renderAll();
+        showToast('Yeni dünya dağılımı oluşturuldu.');
+      }
+
+      // ---------- 7. PROCEDURAL EDITORIAL SVG CARD ART ----------
+      function makeFragmentSvg(pt) {
+        const bg = '#EDE9E0';
+        const c = pt.pigment;
+        if (pt.category === 'architecture') {
+          return `<svg class="discovery-art" viewBox="0 0 320 120" xmlns="http://www.w3.org/2000/svg">
+            <rect width="320" height="120" fill="${bg}"/>
+            <rect x="34" y="24" width="90" height="96" fill="none" stroke="#171614" stroke-width="1.2"/>
+            <path d="M54 120 V64 A25 25 0 0 1 104 64 V120" fill="${c}" fill-opacity="0.24" stroke="${c}" stroke-width="1.5"/>
+            <line x1="150" y1="24" x2="290" y2="24" stroke="#171614" stroke-width="1"/>
+            <line x1="150" y1="54" x2="270" y2="54" stroke="#171614" stroke-width="1" stroke-dasharray="3 3"/>
+            <rect x="176" y="64" width="84" height="56" fill="#171614" fill-opacity="0.08" stroke="#171614"/>
+          </svg>`;
+        }
+        if (pt.category === 'music') {
+          return `<svg class="discovery-art" viewBox="0 0 320 120" xmlns="http://www.w3.org/2000/svg">
+            <rect width="320" height="120" fill="${bg}"/>
+            <path d="M20 60 Q60 15 100 60 T180 60 T260 60 T305 60" fill="none" stroke="${c}" stroke-width="2"/>
+            <path d="M20 60 Q70 95 120 60 T220 60 T305 60" fill="none" stroke="#171614" stroke-opacity="0.35" stroke-width="1.2"/>
+            <circle cx="160" cy="60" r="24" fill="none" stroke="${c}" stroke-dasharray="2 3"/>
+          </svg>`;
+        }
+        return `<svg class="discovery-art" viewBox="0 0 320 120" xmlns="http://www.w3.org/2000/svg">
+          <rect width="320" height="120" fill="${bg}"/>
+          <circle cx="96" cy="60" r="38" fill="${c}" fill-opacity="0.2" stroke="${c}" stroke-width="1.4"/>
+          <line x1="20" y1="60" x2="300" y2="60" stroke="#171614" stroke-opacity="0.22"/>
+          <rect x="160" y="28" width="124" height="64" fill="#fcfbf8" stroke="#171614" stroke-width="1"/>
+          <line x1="174" y1="48" x2="268" y2="48" stroke="#171614" stroke-opacity="0.5"/>
+          <line x1="174" y1="62" x2="248" y2="62" stroke="#171614" stroke-opacity="0.35"/>
+          <line x1="174" y1="76" x2="226" y2="76" stroke="${c}"/>
+        </svg>`;
+      }
+
+      // ---------- 8. GENERATIVE ART ENGINE (ENGINE A + ENGINE B) ----------
+      function renderGenerativeArt() {
+        const canvas = document.getElementById('art-canvas');
+        const ctx = canvas.getContext('2d');
+        const W = canvas.width, H = canvas.height;
+
+        const isDark = state.artStyle === 'nocturne';
+        ctx.fillStyle = isDark ? '#171614' : '#F6F4EF';
+        ctx.fillRect(0, 0, W, H);
+
+        // Cartographic graticule frame
+        ctx.strokeStyle = isDark ? 'rgba(246,244,239,0.09)' : 'rgba(23,22,20,0.08)';
+        ctx.lineWidth = 1;
+        for (let x = 60; x < W; x += 70) {
+          ctx.beginPath(); ctx.moveTo(x, 40); ctx.lineTo(x, H - 40); ctx.stroke();
+        }
+        for (let y = 60; y < H; y += 60) {
+          ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(W - 40, y); ctx.stroke();
+        }
+
+        const proj = (lat, lon) => ({
+          x: 60 + ((lon + 180) / 360) * (W - 120),
+          y: 60 + ((90 - lat) / 180) * (H - 120),
+        });
+
+        // ENGINE B: Material Collage (layered behind/interwoven with routes)
+        if (state.includeCollage) {
+          state.collection.forEach((id, idx) => {
+            const pt = getPoint(id);
+            if (!pt) return;
+            const pos = proj(pt.lat, pt.lon);
+            ctx.save();
+            ctx.translate(pos.x, pos.y);
+            ctx.rotate(((idx % 5) - 2) * 0.08);
+            const cw = 135, ch = 82;
+            ctx.fillStyle = isDark ? 'rgba(252,251,248,0.08)' : 'rgba(237,233,224,0.78)';
+            ctx.strokeStyle = pt.pigment;
+            ctx.lineWidth = 1.2;
+            ctx.fillRect(-cw / 2, -ch / 2, cw, ch);
+            ctx.strokeRect(-cw / 2, -ch / 2, cw, ch);
+
+            ctx.fillStyle = pt.pigment;
+            ctx.globalAlpha = 0.22;
+            ctx.fillRect(-cw / 2 + 8, -ch / 2 + 8, cw - 16, 26);
+            ctx.globalAlpha = 1;
+
+            ctx.fillStyle = isDark ? '#F6F4EF' : '#171614';
+            ctx.font = '11px Georgia, serif';
+            ctx.fillText(pt.title.slice(0, 20), -cw / 2 + 10, 10);
+            ctx.fillStyle = isDark ? '#A59E92' : '#5E5A52';
+            ctx.font = '9px monospace';
+            ctx.fillText(`${pt.category.toUpperCase()} · ${pt.country}`, -cw / 2 + 10, 26);
+            ctx.restore();
+          });
+        }
+
+        // ENGINE A: Network Art (routes, curvature, focal nodes)
+        state.routes.forEach((r, idx) => {
+          const a = getPoint(r.fromId);
+          const b = getPoint(r.toId);
+          if (!a || !b) return;
+          const p1 = proj(a.lat, a.lon);
+          const p2 = proj(b.lat, b.lon);
+          const mx = (p1.x + p2.x) / 2;
+          const my = (p1.y + p2.y) / 2;
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          const curve = r.routeType === 'BEZIER_CURVE' ? 0.34 : r.routeType === 'ORGANIC_PROCEDURAL' ? -0.28 : 0.18;
+          const cx = mx - dy * curve;
+          const cy = my + dx * curve;
+
+          const color = ROUTE_COLORS[r.routeType] || '#b65132';
+
+          // Soft halo in experimental/nocturne modes
+          if (state.artStyle !== 'minimal') {
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.quadraticCurveTo(cx, cy, p2.x, p2.y);
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = 0.2;
+            ctx.lineWidth = state.strokeWeight * 3.5;
+            ctx.stroke();
+          }
+
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.quadraticCurveTo(cx, cy, p2.x, p2.y);
+          ctx.strokeStyle = color;
+          ctx.globalAlpha = 0.9;
+          ctx.lineWidth = state.strokeWeight;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+
+          // Midpoint geometric focal ring
+          ctx.beginPath();
+          ctx.arc((p1.x + 2 * cx + p2.x) / 4, (p1.y + 2 * cy + p2.y) / 4, 4 + (idx % 4) * 2, 0, Math.PI * 2);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        });
+
+        // Discovered coordinate nodes
+        state.points.filter(p => p.discovered).forEach(pt => {
+          const pos = proj(pt.lat, pt.lon);
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, 4.2, 0, Math.PI * 2);
+          ctx.fillStyle = state.collection.includes(pt.id) ? '#3d6b59' : isDark ? '#F6F4EF' : '#171614';
+          ctx.fill();
+        });
+
+        // Editorial footer plate inside artwork
+        const mission = MISSIONS.find(m => m.id === state.missionId);
+        ctx.fillStyle = isDark ? '#F6F4EF' : '#171614';
+        ctx.font = '18px Georgia, serif';
+        ctx.fillText(`GEOCREO — ${mission.title}`, 48, H - 52);
+        ctx.fillStyle = isDark ? '#9E978B' : '#787268';
+        ctx.font = '11px monospace';
+        ctx.fillText(
+          `MOD: ${state.mode} · TOHUM: ${state.seed} · ROTA: ${state.routes.length} · ARŞİV: ${state.collection.length}`,
+          48,
+          H - 32
+        );
+
+        // Narrative & Score
+        const countries = new Set(state.points.filter(p => p.discovered).map(p => p.country));
+        const totalKm = state.routes.reduce((sum, r) => sum + r.distanceKm, 0);
+        document.getElementById('exhibit-narrative').textContent =
+          `${countries.size} ülke ve ${totalKm.toLocaleString('tr-TR')} km’lik küresel bağlantı boyunca izlediğin küratöryel rota, topladığın ${state.collection.length} parçayı özgün bir coğrafi kompozisyona dönüştürdü.`;
+
+        const missionReqsDone = mission.reqs.filter(r => r.check(state)).length;
+        const scoreData = [
+          { label: 'Görev İlerlemesi', val: `%${Math.round((missionReqsDone / mission.reqs.length) * 100)}` },
+          { label: 'Coğrafi Erişim', val: `${countries.size} ülke` },
+          { label: 'Ağ Uzunluğu', val: `${totalKm.toLocaleString('tr-TR')} km` },
+          { label: 'Rota Çeşitliliği', val: `${new Set(state.routes.map(r => r.routeType)).size} tür` },
+        ];
+        document.getElementById('score-grid').innerHTML = scoreData
+          .map(s => `<div class="score-box"><div class="kicker" style="margin:0;">${s.label}</div><div class="score-val">${s.val}</div></div>`)
+          .join('');
+      }
+
+      // ---------- 9. UI RENDERING ----------
+      function renderAll() {
+        // Resources & Tabs
+        document.getElementById('res-discovery').textContent = state.resources.discovery;
+        document.getElementById('res-connection').textContent = state.resources.connection;
+        document.getElementById('res-archive').textContent = `${state.collection.length}/${state.resources.capacity}`;
+        document.getElementById('tab-archive-count').textContent = state.collection.length;
+        document.getElementById('archive-capacity-label').textContent = `${state.collection.length} / ${state.resources.capacity} kapasite`;
+
+        const discCount = state.points.filter(p => p.discovered).length;
+        document.getElementById('stats-summary').textContent = `${discCount} keşif · ${state.routes.length} rota`;
+
+        // Connect banner
+        const banner = document.getElementById('connect-banner');
+        if (state.connectSourceId) {
+          const src = getPoint(state.connectSourceId);
+          banner.classList.remove('view-hidden');
+          document.getElementById('connect-banner-text').textContent =
+            `"${src.title}" (${src.settlement}) noktasından ${ROUTE_LABELS[state.routeType]} çiziliyor — kürede ikinci bir noktaya tıkla.`;
+        } else {
+          banner.classList.add('view-hidden');
+        }
+
+        // Discovery Panel
+        const pt = getPoint(state.selectedPointId);
+        const discEl = document.getElementById('discovery-content');
+        if (pt && pt.discovered) {
+          const isCol = state.collection.includes(pt.id);
+          discEl.innerHTML = `
+            ${makeFragmentSvg(pt)}
+            <h2 class="serif-title">${pt.title}</h2>
+            <div class="tag-row">
+              <span class="tag">${pt.category}</span>
+              <span class="tag">${pt.settlement}, ${pt.country}</span>
+              <span class="tag">${Math.abs(pt.lat)}°${pt.lat >= 0 ? 'K' : 'G'}, ${Math.abs(pt.lon)}°${pt.lon >= 0 ? 'D' : 'B'} (yaklaşık)</span>
+            </div>
+            <p style="margin: 6px 0 0; color: var(--ink-2); font-size: 0.86rem;">${pt.quote}</p>
+            <div class="action-row">
+              <button type="button" class="btn ${isCol ? '' : 'is-primary'}" id="btn-toggle-collect">
+                ${isCol ? 'Arşivden Çıkar' : 'Arşive Ekle'}
+              </button>
+              <button type="button" class="btn is-accent" id="btn-start-connect">
+                Buradan Rota Bağla
+              </button>
+            </div>
+          `;
+          document.getElementById('btn-toggle-collect').addEventListener('click', () => toggleCollect(pt.id));
+          document.getElementById('btn-start-connect').addEventListener('click', () => {
+            state.connectSourceId = pt.id;
+            renderAll();
+          });
+        }
+
+        // Mission Panel
+        const mission = MISSIONS.find(m => m.id === state.missionId);
+        document.getElementById('mission-title').textContent = mission.title;
+        document.getElementById('mission-prompt').textContent = mission.prompt;
+        let doneCount = 0;
+        document.getElementById('mission-reqs').innerHTML = mission.reqs.map(r => {
+          const ok = r.check(state);
+          if (ok) doneCount += 1;
+          return `<li class="req-item ${ok ? 'is-done' : ''}"><span>${r.label}</span><span class="req-badge">${ok ? 'TAMAM' : 'AÇIK'}</span></li>`;
+        }).join('');
+        document.getElementById('mission-progress-label').textContent = `${doneCount}/${mission.reqs.length}`;
+
+        const selEl = document.getElementById('mission-selector');
+        selEl.innerHTML = MISSIONS.map(m => `
+          <button type="button" class="mission-btn ${m.id === state.missionId ? 'is-selected' : ''}" data-mission="${m.id}">
+            <div class="mission-btn-title">${m.title}</div>
+          </button>
+        `).join('');
+        selEl.querySelectorAll('[data-mission]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            state.missionId = btn.dataset.mission;
+            renderAll();
+          });
+        });
+
+        // Archive Grid
+        const archEl = document.getElementById('archive-grid');
+        if (state.collection.length === 0) {
+          archEl.innerHTML = `<p style="color:var(--muted);">Kişisel Arşivin henüz boş. 3B Dünya üzerinde noktaları keşfedip “Arşive Ekle” butonuna tıkla.</p>`;
+        } else {
+          archEl.innerHTML = state.collection.map(id => {
+            const item = getPoint(id);
+            if (!item) return '';
+            return `<article class="archive-card">
+              ${makeFragmentSvg(item)}
+              <div class="serif-title" style="font-size:1rem; margin:0;">${item.title}</div>
+              <div class="kicker" style="margin:0;">${item.category} · ${item.settlement}</div>
+              <button type="button" class="btn" data-remove-col="${item.id}">Çıkar</button>
+            </article>`;
+          }).join('');
+          archEl.querySelectorAll('[data-remove-col]').forEach(btn => {
+            btn.addEventListener('click', () => toggleCollect(btn.dataset.removeCol));
+          });
+        }
+
+        // Route List
+        const routeEl = document.getElementById('route-list');
+        if (state.routes.length === 0) {
+          routeEl.innerHTML = `<p style="color:var(--muted); font-size:0.84rem;">Henüz rota oluşturulmadı. Kürede keşfettiğin bir noktayı seçip “Buradan Rota Bağla”ya tıkla.</p>`;
+        } else {
+          routeEl.innerHTML = state.routes.map(r => {
+            const a = getPoint(r.fromId);
+            const b = getPoint(r.toId);
+            return `<div class="route-row">
+              <span>
+                <span class="dot" style="background:${ROUTE_COLORS[r.routeType]};"></span>
+                ${a?.settlement.replace(' Yakını', '')} → ${b?.settlement.replace(' Yakını', '')} (${r.distanceKm.toLocaleString()} km)
+              </span>
+              <button type="button" class="btn" data-del-route="${r.id}">×</button>
+            </div>`;
+          }).join('');
+          routeEl.querySelectorAll('[data-del-route]').forEach(btn => {
+            btn.addEventListener('click', () => removeRoute(btn.dataset.delRoute));
+          });
+        }
+
+        // Sync 3D & Generative Canvas
+        if (pointsGroup) syncGlobeMarkers();
+        if (routesGroup) syncGlobeRoutes();
+        if (state.tab === 'exhibit') renderGenerativeArt();
+      }
+
+      // ---------- 10. EVENT WIRING ----------
+      window.addEventListener('load', () => {
+        document.querySelectorAll('[data-tab]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            state.tab = btn.dataset.tab;
+            document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('is-active', b === btn));
+            document.getElementById('view-explore').classList.toggle('view-hidden', state.tab !== 'explore');
+            document.getElementById('view-archive').classList.toggle('view-hidden', state.tab !== 'archive');
+            document.getElementById('view-exhibit').classList.toggle('view-hidden', state.tab !== 'exhibit');
+            if (state.tab === 'exhibit') renderGenerativeArt();
+          });
+        });
+
+        document.getElementById('select-mode').addEventListener('change', (e) => {
+          resetWorld(e.target.value, document.getElementById('input-seed').value.trim());
+        });
+
+        document.getElementById('btn-regen').addEventListener('click', () => {
+          resetWorld(
+            document.getElementById('select-mode').value,
+            document.getElementById('input-seed').value.trim()
+          );
+        });
+
+        document.getElementById('select-route-type').addEventListener('change', (e) => {
+          state.routeType = e.target.value;
+          renderAll();
+        });
+
+        document.getElementById('btn-rotate').addEventListener('click', (e) => {
+          state.autoRotate = !state.autoRotate;
+          e.target.textContent = state.autoRotate ? 'Dönüş: Açık' : 'Dönüş: Kapalı';
+          e.target.classList.toggle('is-active', state.autoRotate);
+        });
+
+        document.getElementById('btn-sound').addEventListener('click', (e) => {
+          state.soundOn = !state.soundOn;
+          e.target.textContent = state.soundOn ? 'Ses: Açık' : 'Ses: Kapalı';
+        });
+
+        document.getElementById('btn-cancel-connect').addEventListener('click', () => {
+          state.connectSourceId = null;
+          renderAll();
+        });
+
+        document.getElementById('select-art-style').addEventListener('change', (e) => {
+          state.artStyle = e.target.value;
+          renderGenerativeArt();
+        });
+
+        document.getElementById('range-thickness').addEventListener('input', (e) => {
+          state.strokeWeight = parseFloat(e.target.value);
+          document.getElementById('val-thickness').textContent = state.strokeWeight.toFixed(1);
+          renderGenerativeArt();
+        });
+
+        document.getElementById('chk-collage').addEventListener('change', (e) => {
+          state.includeCollage = e.target.checked;
+          renderGenerativeArt();
+        });
+
+        document.getElementById('btn-export-png').addEventListener('click', () => {
+          const canvas = document.getElementById('art-canvas');
+          const link = document.createElement('a');
+          link.download = `geocreo-sergi-${state.seed}.png`;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+          showToast('Yüksek çözünürlüklü PNG sergi indirildi.');
+        });
+
+        const guideModal = document.getElementById('guide-modal');
+        const closeGuide = () => guideModal.classList.add('view-hidden');
+        document.getElementById('btn-how-to-play').addEventListener('click', () => {
+          guideModal.classList.remove('view-hidden');
+        });
+        document.getElementById('btn-close-guide').addEventListener('click', closeGuide);
+        guideModal.addEventListener('click', (e) => {
+          if (e.target === guideModal) closeGuide();
+        });
+        window.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') closeGuide();
+        });
+
+        initGlobe();
+        resetWorld(state.mode, state.seed);
+      });
+    })();
+  </script>
+</body>
+</html>
