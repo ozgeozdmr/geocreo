@@ -1,10 +1,7 @@
-# GEOCREO — Fikirlerin Coğrafyası
+GEOCREO
 
-3B Dünya üzerinde nokta keşfi, kişisel arşiv (kürasyon), küresel rota ağı (Büyük Daire, Jeodezik, Bézier, Organik, Manuel) ve hibrit generatif sanat sergisi sunan, kurulumsuz tek dosyalık web uygulaması.
+GEOCREO şu anda geliştirilme aşamasındadır.
 
-## GitHub Pages ile Yayınlama
+Fikir, öneri veya geri bildirim paylaşmak isterseniz e-posta gönderebilirsiniz: ozgeo4034@gmail.com
 
-1. GitHub'da `geocreo` adında yeni ve **Public** bir depo (repository) oluşturun.
-2. **Add file → Upload files** seçeneğiyle `index.html` ve `README.md` dosyalarını yükleyip **Commit changes** deyin.
-3. Depo içinde **Settings → Pages** bölümüne gidin, **Branch** olarak `main` (ve `/ (root)`) seçip **Save** butonuna basın.
-4. 1–2 dakika içinde oyununuz `https://<kullanici-adin>.github.io/geocreo/` adresinde yayına açılır.
+Oyunu Dene: GEOCREO'yu Tarayıcıda Aç
